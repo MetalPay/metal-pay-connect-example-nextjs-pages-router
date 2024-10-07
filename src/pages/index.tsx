@@ -1,5 +1,8 @@
 import Image from "next/image";
 import localFont from "next/font/local";
+import crypto from "crypto";
+import { GetServerSideProps } from "next";
+import MetalPayConnectComponent from "./components/metalPayConnect";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -12,12 +15,25 @@ const geistMono = localFont({
   weight: "100 900",
 });
 
-export default function Home() {
+export default function Home({
+  signature,
+  nonce,
+  apiKey,
+}: {
+  signature: string;
+  nonce: string;
+  apiKey: string;
+}) {
   return (
     <div
       className={`${geistSans.variable} ${geistMono.variable} grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]`}
     >
       <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
+        <MetalPayConnectComponent
+          signature={signature}
+          nonce={nonce}
+          apiKey={apiKey}
+        />
         <Image
           className="dark:invert"
           src="https://nextjs.org/icons/next.svg"
@@ -113,3 +129,37 @@ export default function Home() {
     </div>
   );
 }
+
+export const getServerSideProps: GetServerSideProps = async () => {
+  // Secret key from environment variables
+  const secretKey = process.env.SECRET_KEY;
+  const apiKey = process.env.API_KEY;
+
+  if (!secretKey) {
+    console.error("SECRET_KEY must be set in the environment");
+    process.exit(1);
+  }
+
+  // Function to generate a nonce (e.g., a timestamp or a random string)
+  function generateNonce() {
+    return Date.now().toString(); // You can use a more sophisticated method if needed
+  }
+
+  // Function to generate HMAC signature
+  function generateHMAC(nonce: string) {
+    const hmac = crypto.createHmac("sha256", secretKey);
+    hmac.update(nonce + apiKey);
+    return hmac.digest("hex");
+  }
+
+  const nonce = generateNonce();
+  const signature = generateHMAC(nonce);
+
+  return {
+    props: {
+      signature: signature,
+      nonce: nonce,
+      apiKey: apiKey,
+    },
+  };
+};
